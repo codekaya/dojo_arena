@@ -43,7 +43,7 @@ struct Location {
     player_id: u16
 }
 
-const ETH_ADDRESS = 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 ;
+//const ETH_ADDRESS = 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 ;
 
 
 impl GameStorageAccess of StorageAccess::<Game> {
@@ -186,10 +186,12 @@ mod dojo_arena {
         games: LegacyMap::<u256, Game >,
         game_count: u256,
         players: LegacyMap::<u256, Player >,
+        random_seed: u256,
+        game_manager: ContractAddress
     }
 
     #[constructor]
-    fn dojo_arena() {
+    fn constructor() {
         game_count::write(0);
     }
 
@@ -200,6 +202,17 @@ mod dojo_arena {
     }
 
     #[view]
+    fn get_random_seed() -> u256 {
+        return random_seed::read();
+    }
+
+    #[view]
+    fn get_game_manager() -> ContractAddress {
+        return game_manager::read();
+    }
+
+
+    #[view]
     fn get_game_count() -> u256 {
         return game_count::read();
     }
@@ -208,6 +221,11 @@ mod dojo_arena {
     #[view]
     fn get_game(game_id: u256) -> Game {
         return games::read(game_id);
+    }
+
+    #[view]
+    fn get_player(player_id: u256) -> Player {
+        return players::read(player_id);
     }
 
     #[external]
@@ -256,12 +274,56 @@ mod dojo_arena {
             nft_collection_token_id: _nft_collection_token_id
 
         };
-        //let location = Location{game_id: 0, player_id: 0};
-        players::write(0, player);
+        let location = Location{game_id: 0, player_id: 0};
+        players::write(game_id, player);
         
     }
 
+    #[external]
+    fn set_game_manager(address : ContractAddress){
+        game_manager::write(address);
+    }
 
+//------------------
+
+    
+
+    // #[external]
+    // fn start_game(){
+        
+    // }
+
+    // #[external]
+    // fn end_game(){
+        
+    // }
+
+    // #[external]
+    // fn next_turn(){
+        
+    // }
+
+    // #[external]
+    // fn hunt(){
+        
+    // }
+
+    // #[external]
+    // fn hide(){
+        
+    // }
+    // #[external]
+    // fn attack(){
+        
+    // }
+    // #[external]
+    // fn withdraw_max(){
+
+    // }
+    // #[external]
+    // fn withdraw(amount: u256){
+        
+    // }
 
     
 
