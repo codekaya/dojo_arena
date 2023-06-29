@@ -10,9 +10,10 @@ use traits::Into;
 use traits::TryInto;
 use option::OptionTrait;
 
-use starknet::get_caller_address;
 use starknet::contract_address_const;
 use starknet::ContractAddress;
+
+
 
 
 #[derive(Copy, Drop, Serde)] 
@@ -24,7 +25,9 @@ struct Game {
     num_players: u16,
     start_time: u256,
     initial_hp: u16,
-    hunger_level: u16
+    hunger_level: u16,
+    //is_finished: bool
+    //current_tour: u8
 }
 
 #[derive(Copy, Drop, Serde)] 
@@ -34,7 +37,8 @@ struct Player {
     pixel_heroes_id: u16,
     address: ContractAddress,
     nft_collection_address: ContractAddress,
-    nft_collection_token_id: u16
+    nft_collection_token_id: u16,
+    //move_made: bool
 }
 
 #[derive(Copy, Drop, Serde)] 
@@ -44,7 +48,7 @@ struct Location {
 }
 
 //const ETH_ADDRESS = 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 ;
-
+//0x023d5a903ad3eb760ff54ff58e77dc9a141419e15c05ae7b5928665ade39d86a
 
 impl GameStorageAccess of StorageAccess::<Game> {
     fn read(address_domain: u32, base: StorageBaseAddress) -> SyscallResult::<Game> {
@@ -176,10 +180,16 @@ mod dojo_arena {
 
     use starknet::ContractAddress;
     use starknet::StorageAccess;
+    use starknet::get_contract_address;
+    use starknet::get_caller_address;
+
+
 
     use super::Game;
     use super::Player;
     use super::Location;
+
+    use openzeppelin::token::erc20::ERC20;
 
 
     struct Storage {
@@ -193,6 +203,7 @@ mod dojo_arena {
     #[constructor]
     fn constructor() {
         game_count::write(0);
+        let supply = ERC20::_total_supply::read();
     }
 
     
@@ -282,12 +293,29 @@ mod dojo_arena {
     #[external]
     fn set_game_manager(address : ContractAddress){
         game_manager::write(address);
+        let caller_adress = get_caller_address();
+        let contracta = get_contract_address();
+        let miktar : u256 = 2342;
+        //let success = ERC20::transfer_from( sender:caller_adress, recipient:contracta, amount: miktar );
+        
     }
+
+    // #[external]
+    // fn hunt(game_id, player_id){
+
+
+
+    // }
 
 //------------------
 
     
-
+    //contract issues need to be solved
+    //easiest to hardest
+    //first find erc721 end erc20 functions to implement
+    //second find hash function to mapping
+    //third fix randomness for now
+    
     // #[external]
     // fn start_game(){
         
@@ -303,10 +331,7 @@ mod dojo_arena {
         
     // }
 
-    // #[external]
-    // fn hunt(){
-        
-    // }
+ 
 
     // #[external]
     // fn hide(){
