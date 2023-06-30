@@ -1,3 +1,6 @@
+//DOJO ARENA
+//@author kaya
+
 use starknet::StorageAccess;
 use starknet::StorageBaseAddress;
 use starknet::SyscallResult;
@@ -12,6 +15,15 @@ use option::OptionTrait;
 
 use starknet::contract_address_const;
 use starknet::ContractAddress;
+
+#[abi]
+trait IERC20 {
+    #[view]
+    fn name() -> felt252;
+
+    #[external]
+    fn transferFrom(sender: ContractAddress, recipient: ContractAddress, amount: u256) -> bool;
+}
 
 
 
@@ -48,7 +60,6 @@ struct Location {
 }
 
 //const ETH_ADDRESS = 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 ;
-//0x023d5a903ad3eb760ff54ff58e77dc9a141419e15c05ae7b5928665ade39d86a
 
 impl GameStorageAccess of StorageAccess::<Game> {
     fn read(address_domain: u32, base: StorageBaseAddress) -> SyscallResult::<Game> {
@@ -182,14 +193,18 @@ mod dojo_arena {
     use starknet::StorageAccess;
     use starknet::get_contract_address;
     use starknet::get_caller_address;
+    use starknet::contract_address_const;
 
 
+    use super::IERC20DispatcherTrait;
+    use super::IERC20Dispatcher;
 
     use super::Game;
     use super::Player;
     use super::Location;
 
     use openzeppelin::token::erc20::ERC20;
+    use openzeppelin::access::ownable::Ownable;
 
 
     struct Storage {
@@ -201,9 +216,10 @@ mod dojo_arena {
     }
 
     #[constructor]
-    fn constructor() {
-        game_count::write(0);
-        let supply = ERC20::_total_supply::read();
+    fn constructor(owner: ContractAddress) {
+        game_count::write(1);
+        //let supply = ERC20::_total_supply::read();
+        Ownable::initializer();
     }
 
     
@@ -216,6 +232,12 @@ mod dojo_arena {
     fn get_random_seed() -> u256 {
         return random_seed::read();
     }
+
+    #[view]
+    fn owner() -> ContractAddress {
+        return Ownable::_owner::read();
+    }
+
 
     #[view]
     fn get_game_manager() -> ContractAddress {
@@ -293,11 +315,17 @@ mod dojo_arena {
     #[external]
     fn set_game_manager(address : ContractAddress){
         game_manager::write(address);
-        let caller_adress = get_caller_address();
-        let contracta = get_contract_address();
-        let miktar : u256 = 2342;
-        //let success = ERC20::transfer_from( sender:caller_adress, recipient:contracta, amount: miktar );
+    }
+
+    #[external]
+    fn withdraw(amount: u256){
+        let sender : ContractAddress= get_caller_address();
+        let recipient : ContractAddress = get_contract_address();
         
+        
+        let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
+        let success = IERC20Dispatcher { contract_address: token_addr }.transferFrom(sender, recipient, amount);     
+        //assert(success == true, 'Transfer Failed');
     }
 
     // #[external]
@@ -345,10 +373,7 @@ mod dojo_arena {
     // fn withdraw_max(){
 
     // }
-    // #[external]
-    // fn withdraw(amount: u256){
-        
-    // }
+    
 
     
 
