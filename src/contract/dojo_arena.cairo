@@ -40,6 +40,8 @@ struct Game {
     hunger_level: u16,
     //is_finished: bool
     //current_tour: u8
+    //entry_fee : u256
+    //creater: ContractAddress
 }
 
 #[derive(Copy, Drop, Serde)] 
@@ -49,8 +51,9 @@ struct Player {
     pixel_heroes_id: u16,
     address: ContractAddress,
     nft_collection_address: ContractAddress,
-    nft_collection_token_id: u16,
-    //move_made: bool
+    nft_collection_token_id: u16
+    //move_made: bool,
+    //is_dead: bool
 }
 
 #[derive(Copy, Drop, Serde)] 
@@ -60,6 +63,7 @@ struct Location {
 }
 
 //const ETH_ADDRESS = 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 ;
+// 0x05d28ab3eff3775b395ed163dae1bcd407171a95ade6b238bd27e6df61478b84
 
 impl GameStorageAccess of StorageAccess::<Game> {
     fn read(address_domain: u32, base: StorageBaseAddress) -> SyscallResult::<Game> {
@@ -206,6 +210,8 @@ mod dojo_arena {
     use openzeppelin::token::erc20::ERC20;
     use openzeppelin::access::ownable::Ownable;
 
+    const MAX_HEALTH: u16 = 2400;
+
 
     struct Storage {
         games: LegacyMap::<u256, Game >,
@@ -214,11 +220,20 @@ mod dojo_arena {
         random_seed: u256,
         game_manager: ContractAddress
     }
+    
+    #[event]
+    fn game_created(game_id: u256, game: Game , creator: ContractAddress) {}
+    
+    #[event]
+    fn player_joined(game_id: u256, player_id: u256, player: Player, address: ContractAddress) {}
+
+    #[event]
+    fn move_made(game_id: u256, player_id: u256, address: ContractAddress) {}
 
     #[constructor]
-    fn constructor(owner: ContractAddress) {
+    fn constructor() {
         game_count::write(1);
-        //let supply = ERC20::_total_supply::read();
+        let supply = ERC20::_total_supply::read();
         Ownable::initializer();
     }
 
@@ -270,6 +285,8 @@ mod dojo_arena {
         _initial_hp: u16,
         _hunger_level: u16 ){
         
+        let caller : ContractAddress= get_caller_address();
+
         let game = Game{
             name: _name,
             nft_collection_address: _nft_collection_address,
@@ -284,14 +301,16 @@ mod dojo_arena {
 
         let _game_count = game_count::read();
         game_count::write(_game_count+1);
+        let game_id = game_count::read();
 
         games::write(game_count::read(), game);
+
+        game_created(game_id, game, caller);
         
     }
 
     #[external]
-    fn create_player(game_id:u256,
-        _health: u16,
+    fn join_game(game_id:u256,
         _name: felt252,
         _pixel_heroes_id: u16,
         _address: ContractAddress,
@@ -299,7 +318,7 @@ mod dojo_arena {
         _nft_collection_token_id: u16 ){
         
         let player = Player{
-            health: _health,
+            health: MAX_HEALTH,
             name: _name,
             pixel_heroes_id: _pixel_heroes_id,
             address: _address,
@@ -309,6 +328,9 @@ mod dojo_arena {
         };
         let location = Location{game_id: 0, player_id: 0};
         players::write(game_id, player);
+
+        //player_joined(game_id, );
+
         
     }
 
