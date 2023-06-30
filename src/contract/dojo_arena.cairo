@@ -23,6 +23,12 @@ trait IERC20 {
 
     #[external]
     fn transferFrom(sender: ContractAddress, recipient: ContractAddress, amount: u256) -> bool;
+
+    #[view]
+    fn balanceOf(account: ContractAddress) -> u256;
+
+    #[external]
+    fn transfer(recipient: ContractAddress, amount: u256) -> bool;
 }
 
 
@@ -38,10 +44,10 @@ struct Game {
     start_time: u256,
     initial_hp: u16,
     hunger_level: u16,
-    //is_finished: bool
-    //current_tour: u8
-    //entry_fee : u256
-    //creater: ContractAddress
+    is_active: bool,
+    current_tour: u8,
+    entry_fee : u256
+    // creator: ContractAddress
 }
 
 #[derive(Copy, Drop, Serde)] 
@@ -91,8 +97,22 @@ impl GameStorageAccess of StorageAccess::<Game> {
         let hunger_level_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
         let hunger_level = StorageAccess::read(address_domain, hunger_level_base)?;
 
+        let is_active_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
+        let is_active = StorageAccess::read(address_domain, is_active_base)?;
 
-        Result::Ok(Game { name , nft_collection_address, turn_duration, max_players, num_players, start_time, initial_hp, hunger_level})
+        let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 9_u8).into());
+        let current_tour = StorageAccess::read(address_domain, current_tour_base)?;
+
+        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 10_u8).into());
+        let entry_fee = StorageAccess::read(address_domain, entry_fee_base)?;
+
+        // let creator_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
+        // let creator = StorageAccess::read(address_domain, creator_base)?;
+
+
+
+
+        Result::Ok(Game { name , nft_collection_address, turn_duration, max_players, num_players, start_time, initial_hp, hunger_level, is_active, current_tour, entry_fee})
 
     }
 
@@ -118,7 +138,19 @@ impl GameStorageAccess of StorageAccess::<Game> {
         StorageAccess::write(address_domain, initial_hp_base, value.initial_hp)?;
 
         let hunger_level_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
-        StorageAccess::write(address_domain, hunger_level_base, value.hunger_level)
+        StorageAccess::write(address_domain, hunger_level_base, value.hunger_level)?;
+
+        let is_active_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
+        StorageAccess::write(address_domain, is_active_base, value.is_active)?;
+
+        let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 9_u8).into());
+        StorageAccess::write(address_domain, current_tour_base, value.current_tour)?;
+
+        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 10_u8).into());
+        StorageAccess::write(address_domain, entry_fee_base, value.entry_fee)
+
+        // let creator_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
+        // StorageAccess::write(address_domain, creator_base, value.creator)
 
     }
 }
@@ -216,25 +248,29 @@ mod dojo_arena {
     struct Storage {
         games: LegacyMap::<u256, Game >,
         game_count: u256,
-        players: LegacyMap::<u256, Player >,
+        players: LegacyMap::<(u256,u16), Player >,
         random_seed: u256,
-        game_manager: ContractAddress
+        game_manager: ContractAddress,
+        owner: ContractAddress
     }
     
     #[event]
     fn game_created(game_id: u256, game: Game , creator: ContractAddress) {}
     
     #[event]
-    fn player_joined(game_id: u256, player_id: u256, player: Player, address: ContractAddress) {}
+    fn player_joined(game_id: u256, player_id: u16, player: Player, address: ContractAddress) {}
 
     #[event]
     fn move_made(game_id: u256, player_id: u256, address: ContractAddress) {}
 
     #[constructor]
     fn constructor() {
-        game_count::write(1);
-        let supply = ERC20::_total_supply::read();
-        Ownable::initializer();
+        game_count::write(0);
+        //let address = get_caller_address();
+        let address = contract_address_const::<0x00b42717976be9f43281e55e2420e6c41517cfd79076a7705fa3e91656d35bfb>();
+        owner::write(address);
+        //let supply = ERC20::_total_supply::read();
+        //Ownable::initializer();
     }
 
     
@@ -249,8 +285,8 @@ mod dojo_arena {
     }
 
     #[view]
-    fn owner() -> ContractAddress {
-        return Ownable::_owner::read();
+    fn get_owner() -> ContractAddress {
+        return owner::read();
     }
 
 
@@ -272,8 +308,8 @@ mod dojo_arena {
     }
 
     #[view]
-    fn get_player(player_id: u256) -> Player {
-        return players::read(player_id);
+    fn get_player(game_id: u256,player_id: u16) -> Player {
+        return players::read((game_id,player_id));
     }
 
     #[external]
@@ -283,7 +319,8 @@ mod dojo_arena {
         _max_players: u16,
         _start_time: u256,
         _initial_hp: u16,
-        _hunger_level: u16 ){
+        _hunger_level: u16,
+        _entry_fee:u256 ){
         
         let caller : ContractAddress= get_caller_address();
 
@@ -295,8 +332,10 @@ mod dojo_arena {
             num_players: 0,
             start_time: _start_time,
             initial_hp: _initial_hp,
-            hunger_level: _hunger_level
-
+            hunger_level: _hunger_level,
+            is_active : true,
+            current_tour: 0,
+            entry_fee: _entry_fee
         };
 
         let _game_count = game_count::read();
@@ -313,42 +352,70 @@ mod dojo_arena {
     fn join_game(game_id:u256,
         _name: felt252,
         _pixel_heroes_id: u16,
-        _address: ContractAddress,
         _nft_collection_address: ContractAddress,
         _nft_collection_token_id: u16 ){
         
+        let game = games::read(game_id);
+        let _game_count = game_count::read();
+        assert(game_id<=_game_count,'Invalid Game Id');
+        assert(game_id>0, 'Invalid Game Id');
         let player = Player{
             health: MAX_HEALTH,
             name: _name,
             pixel_heroes_id: _pixel_heroes_id,
-            address: _address,
+            address: get_caller_address(),
             nft_collection_address: _nft_collection_address,
             nft_collection_token_id: _nft_collection_token_id
 
         };
-        let location = Location{game_id: 0, player_id: 0};
-        players::write(game_id, player);
+        let player_id = game.num_players + 1;
+        let location = Location{game_id: 0, player_id: player_id};
 
-        //player_joined(game_id, );
+        players::write((game_id,player_id), player);
+
+        player_joined(game_id, player_id, player, get_caller_address());
 
         
     }
 
     #[external]
     fn set_game_manager(address : ContractAddress){
+        let _owner = owner::read();
+        assert(_owner == get_caller_address(), 'Caller is not owner');
         game_manager::write(address);
+
+        // let sender : ContractAddress= get_caller_address();
+        // let recipient : ContractAddress = get_contract_address();
+        
+        
+        // let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
+        // let success = IERC20Dispatcher { contract_address: token_addr }.transferFrom(sender, recipient, amount); 
     }
 
     #[external]
     fn withdraw(amount: u256){
-        let sender : ContractAddress= get_caller_address();
-        let recipient : ContractAddress = get_contract_address();
+        let recipient = owner::read();
+        assert(recipient == get_caller_address(), 'Caller is not owner');
+        let sender : ContractAddress = get_contract_address();
         
         
         let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
-        let success = IERC20Dispatcher { contract_address: token_addr }.transferFrom(sender, recipient, amount);     
-        //assert(success == true, 'Transfer Failed');
+        let success = IERC20Dispatcher { contract_address: token_addr }.transfer(recipient, amount);
+
+        assert(success, 'Transfer Failed');
     }
+
+    #[external]
+    fn withdraw_max(){
+        let recipient = owner::read();
+        assert(recipient == get_caller_address(), 'Caller is not owner');
+        let sender : ContractAddress = get_contract_address();
+        let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
+        let amount = IERC20Dispatcher { contract_address: token_addr }.balanceOf(sender);
+        let success = IERC20Dispatcher { contract_address: token_addr }.transfer(recipient, amount);
+        assert(success, 'Transfer Failed');
+    }
+
 
     // #[external]
     // fn hunt(game_id, player_id){
@@ -391,10 +458,7 @@ mod dojo_arena {
     // fn attack(){
         
     // }
-    // #[external]
-    // fn withdraw_max(){
-
-    // }
+   
     
 
     
