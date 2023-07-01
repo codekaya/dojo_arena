@@ -38,16 +38,18 @@ trait IERC20 {
 struct Game {
     name: felt252,
     nft_collection_address: ContractAddress,
-    turn_duration: u256,
+    turn_duration: u64,
     max_players: u16,
     num_players: u16,
-    start_time: u256,
+    start_time: u64,
     initial_hp: u16,
     hunger_level: u16,
     is_active: bool,
     current_tour: u8,
-    entry_fee : u256
+    entry_fee : u256,
+    //winner: ContractAddress
     // creator: ContractAddress
+    //prize: u 256
 }
 
 #[derive(Copy, Drop, Serde)] 
@@ -62,11 +64,6 @@ struct Player {
     //is_dead: bool
 }
 
-#[derive(Copy, Drop, Serde)] 
-struct Location {
-    game_id: u256,
-    player_id: u16
-}
 
 //const ETH_ADDRESS = 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 ;
 // 0x05d28ab3eff3775b395ed163dae1bcd407171a95ade6b238bd27e6df61478b84
@@ -201,26 +198,7 @@ impl PlayerStorageAccess of StorageAccess::<Player> {
     }
 }
 
-impl LocationStorageAccess of StorageAccess::<Location> {
-    fn read(address_domain: u32, base: StorageBaseAddress) -> SyscallResult::<Location> {
 
-        let game_id = StorageAccess::read(address_domain, base)?;
-
-        let player_id_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 1_u8).into());
-        let player_id = StorageAccess::read(address_domain, player_id_base)?;
-
-        Result::Ok(Location {game_id, player_id})
-
-    }
-
-    fn write(address_domain: u32, base: StorageBaseAddress, value: Location) -> SyscallResult::<()> {
-        StorageAccess::write(address_domain, base, value.game_id)?;
-
-        let player_id_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 1_u8).into());
-        StorageAccess::write(address_domain, player_id_base, value.player_id)
-
-    }
-}
 
 #[contract]
 mod dojo_arena {
@@ -230,14 +208,13 @@ mod dojo_arena {
     use starknet::get_contract_address;
     use starknet::get_caller_address;
     use starknet::contract_address_const;
-
+    use starknet::get_block_timestamp;
 
     use super::IERC20DispatcherTrait;
     use super::IERC20Dispatcher;
 
     use super::Game;
     use super::Player;
-    use super::Location;
 
     use openzeppelin::token::erc20::ERC20;
     use openzeppelin::access::ownable::Ownable;
@@ -251,7 +228,7 @@ mod dojo_arena {
         players: LegacyMap::<(u256,u16), Player >,
         random_seed: u256,
         game_manager: ContractAddress,
-        owner: ContractAddress
+        owner: ContractAddress,
     }
     
     #[event]
@@ -282,6 +259,10 @@ mod dojo_arena {
     #[view]
     fn get_random_seed() -> u256 {
         return random_seed::read();
+    }
+    #[view]
+    fn get_time_stamp() -> u64 {
+        return get_block_timestamp();
     }
 
     #[view]
@@ -315,14 +296,32 @@ mod dojo_arena {
     #[external]
     fn create_game(_name: felt252,
         _nft_collection_address: ContractAddress,
-        _turn_duration: u256,
+        _turn_duration: u64,
         _max_players: u16,
-        _start_time: u256,
+        _start_time: u64,
         _initial_hp: u16,
         _hunger_level: u16,
         _entry_fee:u256 ){
         
+        // let fee = game.entry_fee;
+        //assert(fee>=11000000000000000, 'Not Enough Fee');
+
+        // let sender : ContractAddress= get_caller_address();
+        // let recipient : ContractAddress = get_contract_address();
+        // let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
+        // let success = IERC20Dispatcher { contract_address: token_addr }.transferFrom(sender, recipient, fee); 
+        // assert(success, 'Transfer Failed');
+
+
         let caller : ContractAddress= get_caller_address();
+
+        let start_time_min = get_block_timestamp()+36000;
+        let start_time_max = get_block_timestamp()+864000;
+        assert(_start_time>= start_time_min,'Start Time too soon');
+        assert(_start_time<= start_time_max,'Start Time too long');
+
+        assert(_turn_duration>=3600,'Turn Duration under 1 hour');
+        assert(_turn_duration<=21600,'Turn Duration above 6 hour');
 
         let game = Game{
             name: _name,
@@ -355,10 +354,23 @@ mod dojo_arena {
         _nft_collection_address: ContractAddress,
         _nft_collection_token_id: u16 ){
         
-        let game = games::read(game_id);
         let _game_count = game_count::read();
         assert(game_id<=_game_count,'Invalid Game Id');
         assert(game_id>0, 'Invalid Game Id');
+        let game = games::read(game_id);
+
+        
+        let fee = game.entry_fee;
+        //assert(fee>=11000000000000000, 'Not Enough Fee');
+
+        let sender : ContractAddress= get_caller_address();
+        let recipient : ContractAddress = get_contract_address();
+        let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
+        let success = IERC20Dispatcher { contract_address: token_addr }.transferFrom(sender, recipient, fee); 
+        assert(success, 'Transfer Failed');
+
+        assert(game.max_players>game.num_players, 'Game is full');
+
         let player = Player{
             health: MAX_HEALTH,
             name: _name,
@@ -369,7 +381,6 @@ mod dojo_arena {
 
         };
         let player_id = game.num_players + 1;
-        let location = Location{game_id: 0, player_id: player_id};
 
         players::write((game_id,player_id), player);
 
@@ -391,6 +402,89 @@ mod dojo_arena {
         // let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
         // let success = IERC20Dispatcher { contract_address: token_addr }.transferFrom(sender, recipient, amount); 
     }
+
+    #[external]
+    fn start_game(game_id:u256){
+
+        let _game_count = game_count::read();
+        assert(game_id<=_game_count,'Invalid Game Id');
+        assert(game_id>0, 'Invalid Game Id');
+        let game = games::read(game_id);
+        assert(game.is_active,'Game is not active');
+        //assert(get_block_timestamp>=game.start_time, 'Wait for Start Time');
+        //assert(game.num_players>=32, 'Not enough players');
+        
+    }
+
+    #[external]
+    fn hunt(game_id: u256, player_id: u16){
+        let _game_count = game_count::read();
+        assert(game_id<=_game_count,'Invalid Game Id');
+        assert(game_id>0, 'Invalid Game Id');
+        let game = games::read(game_id);
+        assert(game.is_active,'Game is not active');
+
+        assert(player_id<=game.num_players, 'Invalid Player Id');
+        assert(player_id>0, 'Invalid Player Id');
+
+        let player = players::read((game_id,player_id));
+        let caller : ContractAddress= get_caller_address();
+        assert(player.address == get_caller_address(), 'Caller is not player');
+        //assert(player.move_made)
+
+
+
+
+
+
+    }
+
+    #[external]
+    fn hide(game_id: u256, player_id: u16){
+        let _game_count = game_count::read();
+        assert(game_id<=_game_count,'Invalid Game Id');
+        assert(game_id>0, 'Invalid Game Id');
+        let game = games::read(game_id);
+        assert(game.is_active,'Game is not active');
+
+        assert(player_id<=game.num_players, 'Invalid Player Id');
+        assert(player_id>0, 'Invalid Player Id');
+
+        let player = players::read((game_id,player_id));
+        let caller : ContractAddress= get_caller_address();
+        assert(player.address == get_caller_address(), 'Caller is not player');
+        //assert(player.move_made)
+        
+    }
+    #[external]
+    fn attack(game_id: u256, player_id: u16){
+        let _game_count = game_count::read();
+        assert(game_id<=_game_count,'Invalid Game Id');
+        assert(game_id>0, 'Invalid Game Id');
+        let game = games::read(game_id);
+        assert(game.is_active,'Game is not active');
+
+        assert(player_id<=game.num_players, 'Invalid Player Id');
+        assert(player_id>0, 'Invalid Player Id');
+
+        let player = players::read((game_id,player_id));
+        let caller : ContractAddress= get_caller_address();
+        assert(player.address == get_caller_address(), 'Caller is not player');
+        //assert(player.move_made)
+        
+    }
+
+    #[external]
+    fn end_game(game_id: u256){
+        
+        let _game_count = game_count::read();
+        assert(game_id<=_game_count,'Invalid Game Id');
+        assert(game_id>0, 'Invalid Game Id');
+        let game = games::read(game_id);
+        assert(game.is_active,'Game is not active');
+    }
+
+    
 
     #[external]
     fn withdraw(amount: u256){
@@ -417,12 +511,7 @@ mod dojo_arena {
     }
 
 
-    // #[external]
-    // fn hunt(game_id, player_id){
-
-
-
-    // }
+    
 
 //------------------
 
@@ -433,15 +522,9 @@ mod dojo_arena {
     //second find hash function to mapping
     //third fix randomness for now
     
-    // #[external]
-    // fn start_game(){
-        
-    // }
+    
 
-    // #[external]
-    // fn end_game(){
-        
-    // }
+    
 
     // #[external]
     // fn next_turn(){
@@ -450,14 +533,7 @@ mod dojo_arena {
 
  
 
-    // #[external]
-    // fn hide(){
-        
-    // }
-    // #[external]
-    // fn attack(){
-        
-    // }
+    
    
     
 
