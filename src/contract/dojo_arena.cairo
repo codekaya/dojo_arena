@@ -38,7 +38,10 @@ trait IERC20 {
 struct Game {
     name: felt252,
     nft_collection_address: ContractAddress,
+    winner: ContractAddress,
+    game_creator: ContractAddress,
     turn_duration: u64,
+    prize: u256,
     max_players: u16,
     num_players: u16,
     start_time: u64,
@@ -47,9 +50,7 @@ struct Game {
     is_active: bool,
     current_tour: u8,
     entry_fee : u256,
-    //winner: ContractAddress
-    // creator: ContractAddress
-    //prize: u 256
+    
 }
 
 #[derive(Copy, Drop, Serde)] 
@@ -59,14 +60,14 @@ struct Player {
     pixel_heroes_id: u16,
     address: ContractAddress,
     nft_collection_address: ContractAddress,
-    nft_collection_token_id: u16
-    //move_made: bool,
-    //is_dead: bool
+    nft_collection_token_id: u16,
+    move_turn: u8,
+    is_alive: bool
 }
 
 
 //const ETH_ADDRESS = 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 ;
-// 0x05d28ab3eff3775b395ed163dae1bcd407171a95ade6b238bd27e6df61478b84
+// 0x0610d5da32f3ab30078469753b029e0b9f5aaa67a196322530d190fe1dfdfa05
 
 impl GameStorageAccess of StorageAccess::<Game> {
     fn read(address_domain: u32, base: StorageBaseAddress) -> SyscallResult::<Game> {
@@ -76,40 +77,48 @@ impl GameStorageAccess of StorageAccess::<Game> {
         let nft_collection_address_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 1_u8).into());
         let nft_collection_address = StorageAccess::read(address_domain, nft_collection_address_base)?;
 
-        let turn_duration_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 2_u8).into());
+        let winner_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 2_u8).into());
+        let winner = StorageAccess::read(address_domain, winner_base)?;
+
+        let game_creator_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 3_u8).into());
+        let game_creator = StorageAccess::read(address_domain, game_creator_base)?;
+
+        let turn_duration_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 4_u8).into());
         let turn_duration = StorageAccess::read(address_domain, turn_duration_base)?;
 
-        let max_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 3_u8).into());
+        let prize_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 5_u8).into());
+        let prize = StorageAccess::read(address_domain, prize_base)?;
+
+        let max_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 6_u8).into());
         let max_players = StorageAccess::read(address_domain, max_players_base)?;
 
-        let num_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 4_u8).into());
+        let num_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
         let num_players = StorageAccess::read(address_domain, num_players_base)?;
 
-        let start_time_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 5_u8).into());
+        let start_time_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
         let start_time = StorageAccess::read(address_domain, start_time_base)?;
 
-        let initial_hp_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 6_u8).into());
+        let initial_hp_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 9_u8).into());
         let initial_hp = StorageAccess::read(address_domain, initial_hp_base)?;
 
-        let hunger_level_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
+        let hunger_level_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 10_u8).into());
         let hunger_level = StorageAccess::read(address_domain, hunger_level_base)?;
 
-        let is_active_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
+        let is_active_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
         let is_active = StorageAccess::read(address_domain, is_active_base)?;
 
-        let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 9_u8).into());
+        let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 12_u8).into());
         let current_tour = StorageAccess::read(address_domain, current_tour_base)?;
 
-        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 10_u8).into());
+        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 13_u8).into());
         let entry_fee = StorageAccess::read(address_domain, entry_fee_base)?;
 
-        // let creator_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
-        // let creator = StorageAccess::read(address_domain, creator_base)?;
+    
 
 
 
 
-        Result::Ok(Game { name , nft_collection_address, turn_duration, max_players, num_players, start_time, initial_hp, hunger_level, is_active, current_tour, entry_fee})
+        Result::Ok(Game { name , nft_collection_address, winner, game_creator, turn_duration, prize,  max_players, num_players, start_time, initial_hp, hunger_level, is_active, current_tour, entry_fee})
 
     }
 
@@ -119,35 +128,43 @@ impl GameStorageAccess of StorageAccess::<Game> {
         let nft_collection_address_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 1_u8).into());
         StorageAccess::write(address_domain, nft_collection_address_base, value.nft_collection_address)?;
 
-        let turn_duration_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 2_u8).into());
+        let winner_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 2_u8).into());
+        StorageAccess::write(address_domain, winner_base, value.winner)?;
+
+        let game_creator_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 3_u8).into());
+        StorageAccess::write(address_domain, game_creator_base, value.game_creator)?;
+
+        let turn_duration_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 4_u8).into());
         StorageAccess::write(address_domain, turn_duration_base, value.turn_duration)?;
 
-        let max_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 3_u8).into());
+        let prize_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 5_u8).into());
+        StorageAccess::write(address_domain, prize_base, value.prize)?;
+
+        let max_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 6_u8).into());
         StorageAccess::write(address_domain, max_players_base, value.max_players)?;
 
-        let num_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 4_u8).into());
+        let num_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
         StorageAccess::write(address_domain, num_players_base, value.num_players)?;
 
-        let start_time_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 5_u8).into());
+        let start_time_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
         StorageAccess::write(address_domain, start_time_base, value.start_time)?;
 
-        let initial_hp_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 6_u8).into());
+        let initial_hp_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 9_u8).into());
         StorageAccess::write(address_domain, initial_hp_base, value.initial_hp)?;
 
-        let hunger_level_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
+        let hunger_level_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 10_u8).into());
         StorageAccess::write(address_domain, hunger_level_base, value.hunger_level)?;
 
-        let is_active_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
+        let is_active_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
         StorageAccess::write(address_domain, is_active_base, value.is_active)?;
 
-        let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 9_u8).into());
+        let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 12_u8).into());
         StorageAccess::write(address_domain, current_tour_base, value.current_tour)?;
 
-        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 10_u8).into());
+        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 13_u8).into());
         StorageAccess::write(address_domain, entry_fee_base, value.entry_fee)
 
-        // let creator_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
-        // StorageAccess::write(address_domain, creator_base, value.creator)
+        
 
     }
 }
@@ -172,8 +189,13 @@ impl PlayerStorageAccess of StorageAccess::<Player> {
         let nft_collection_token_id_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 5_u8).into());
         let nft_collection_token_id = StorageAccess::read(address_domain, nft_collection_token_id_base)?;
 
+        let move_turn_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 6_u8).into());
+        let move_turn = StorageAccess::read(address_domain, move_turn_base)?;
 
-        Result::Ok(Player {health, name, pixel_heroes_id, address, nft_collection_address, nft_collection_token_id})
+        let is_alive_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
+        let is_alive = StorageAccess::read(address_domain, is_alive_base)?;
+
+        Result::Ok(Player {health, name, pixel_heroes_id, address, nft_collection_address, nft_collection_token_id, move_turn, is_alive})
 
     }
 
@@ -193,7 +215,13 @@ impl PlayerStorageAccess of StorageAccess::<Player> {
         StorageAccess::write(address_domain, nft_collection_address_base, value.nft_collection_address)?;
 
         let nft_collection_token_id_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 5_u8).into());
-        StorageAccess::write(address_domain, nft_collection_token_id_base, value.nft_collection_token_id)
+        StorageAccess::write(address_domain, nft_collection_token_id_base, value.nft_collection_token_id)?;
+
+        let move_turn_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 6_u8).into());
+        StorageAccess::write(address_domain, move_turn_base, value.move_turn)?;
+
+        let is_alive_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
+        StorageAccess::write(address_domain, is_alive_base, value.is_alive)
 
     }
 }
@@ -303,8 +331,7 @@ mod dojo_arena {
         _hunger_level: u16,
         _entry_fee:u256 ){
         
-        // let fee = game.entry_fee;
-        //assert(fee>=11000000000000000, 'Not Enough Fee');
+        //assert(_entry_fee>=11000000000000000, 'Not Enough Fee');
 
         // let sender : ContractAddress= get_caller_address();
         // let recipient : ContractAddress = get_contract_address();
@@ -313,7 +340,7 @@ mod dojo_arena {
         // assert(success, 'Transfer Failed');
 
 
-        let caller : ContractAddress= get_caller_address();
+        
 
         let start_time_min = get_block_timestamp()+36000;
         let start_time_max = get_block_timestamp()+864000;
@@ -323,10 +350,15 @@ mod dojo_arena {
         assert(_turn_duration>=3600,'Turn Duration under 1 hour');
         assert(_turn_duration<=21600,'Turn Duration above 6 hour');
 
+        let _winner = get_contract_address();
+        let _caller = get_caller_address();
         let game = Game{
             name: _name,
             nft_collection_address: _nft_collection_address,
+            winner: _winner,
+            game_creator: _caller,
             turn_duration: _turn_duration,
+            prize: 0,
             max_players: _max_players,
             num_players: 0,
             start_time: _start_time,
@@ -343,7 +375,7 @@ mod dojo_arena {
 
         games::write(game_count::read(), game);
 
-        game_created(game_id, game, caller);
+        game_created(game_id, game, _caller);
         
     }
 
@@ -357,7 +389,7 @@ mod dojo_arena {
         let _game_count = game_count::read();
         assert(game_id<=_game_count,'Invalid Game Id');
         assert(game_id>0, 'Invalid Game Id');
-        let game = games::read(game_id);
+        let mut game = games::read(game_id);
 
         
         let fee = game.entry_fee;
@@ -377,10 +409,14 @@ mod dojo_arena {
             pixel_heroes_id: _pixel_heroes_id,
             address: get_caller_address(),
             nft_collection_address: _nft_collection_address,
-            nft_collection_token_id: _nft_collection_token_id
+            nft_collection_token_id: _nft_collection_token_id,
+            move_turn: 1,
+            is_alive: true
 
         };
         let player_id = game.num_players + 1;
+
+        game.num_players = player_id;
 
         players::write((game_id,player_id), player);
 
@@ -409,11 +445,13 @@ mod dojo_arena {
         let _game_count = game_count::read();
         assert(game_id<=_game_count,'Invalid Game Id');
         assert(game_id>0, 'Invalid Game Id');
-        let game = games::read(game_id);
+        let mut game = games::read(game_id);
         assert(game.is_active,'Game is not active');
         //assert(get_block_timestamp>=game.start_time, 'Wait for Start Time');
         //assert(game.num_players>=32, 'Not enough players');
-        
+
+
+        game.current_tour = 1;        
     }
 
     #[external]
@@ -475,6 +513,15 @@ mod dojo_arena {
     }
 
     #[external]
+    fn next_turn(game_id: u256){
+        let _game_count = game_count::read();
+        assert(game_id<=_game_count,'Invalid Game Id');
+        assert(game_id>0, 'Invalid Game Id');
+        let game = games::read(game_id);
+        assert(game.is_active,'Game is not active');
+    }
+
+    #[external]
     fn end_game(game_id: u256){
         
         let _game_count = game_count::read();
@@ -482,6 +529,8 @@ mod dojo_arena {
         assert(game_id>0, 'Invalid Game Id');
         let game = games::read(game_id);
         assert(game.is_active,'Game is not active');
+
+
     }
 
     
@@ -510,33 +559,12 @@ mod dojo_arena {
         assert(success, 'Transfer Failed');
     }
 
-
-    
-
-//------------------
-
     
     //contract issues need to be solved
     //easiest to hardest
     //first find erc721 end erc20 functions to implement
     //second find hash function to mapping
     //third fix randomness for now
-    
-    
-
-    
-
-    // #[external]
-    // fn next_turn(){
-        
-    // }
-
- 
-
-    
-   
-    
-
-    
+      
 
 }
