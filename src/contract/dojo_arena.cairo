@@ -41,7 +41,6 @@ struct Game {
     winner: ContractAddress,
     game_creator: ContractAddress,
     turn_duration: u64,
-    prize: u256,
     max_players: u16,
     num_players: u16,
     start_time: u64,
@@ -50,6 +49,8 @@ struct Game {
     is_active: bool,
     current_tour: u8,
     entry_fee : u256,
+    prize: u256,
+
     
 }
 
@@ -62,12 +63,13 @@ struct Player {
     nft_collection_address: ContractAddress,
     nft_collection_token_id: u16,
     move_turn: u8,
-    is_alive: bool
+    is_alive: bool,
+    move: u8
 }
 
 
 //const ETH_ADDRESS = 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 ;
-// 0x0610d5da32f3ab30078469753b029e0b9f5aaa67a196322530d190fe1dfdfa05
+// 0x00949f2bd2385e964d5abd755a53910b742b3643ff6847d010ba9ee6ab88d263
 
 impl GameStorageAccess of StorageAccess::<Game> {
     fn read(address_domain: u32, base: StorageBaseAddress) -> SyscallResult::<Game> {
@@ -86,39 +88,39 @@ impl GameStorageAccess of StorageAccess::<Game> {
         let turn_duration_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 4_u8).into());
         let turn_duration = StorageAccess::read(address_domain, turn_duration_base)?;
 
-        let prize_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 5_u8).into());
-        let prize = StorageAccess::read(address_domain, prize_base)?;
-
-        let max_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 6_u8).into());
+        let max_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 5_u8).into());
         let max_players = StorageAccess::read(address_domain, max_players_base)?;
 
-        let num_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
+        let num_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 6_u8).into());
         let num_players = StorageAccess::read(address_domain, num_players_base)?;
 
-        let start_time_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
+        let start_time_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
         let start_time = StorageAccess::read(address_domain, start_time_base)?;
 
-        let initial_hp_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 9_u8).into());
+        let initial_hp_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
         let initial_hp = StorageAccess::read(address_domain, initial_hp_base)?;
 
-        let hunger_level_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 10_u8).into());
+        let hunger_level_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 9_u8).into());
         let hunger_level = StorageAccess::read(address_domain, hunger_level_base)?;
 
-        let is_active_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
+        let is_active_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 10_u8).into());
         let is_active = StorageAccess::read(address_domain, is_active_base)?;
 
-        let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 12_u8).into());
+        let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
         let current_tour = StorageAccess::read(address_domain, current_tour_base)?;
 
-        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 13_u8).into());
+        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 12_u8).into());
         let entry_fee = StorageAccess::read(address_domain, entry_fee_base)?;
+
+        let prize_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 13_u8).into());
+        let prize = StorageAccess::read(address_domain, prize_base)?;
 
     
 
 
 
 
-        Result::Ok(Game { name , nft_collection_address, winner, game_creator, turn_duration, prize,  max_players, num_players, start_time, initial_hp, hunger_level, is_active, current_tour, entry_fee})
+        Result::Ok(Game { name , nft_collection_address, winner, game_creator, turn_duration,  max_players, num_players, start_time, initial_hp, hunger_level, is_active, current_tour, entry_fee, prize})
 
     }
 
@@ -137,34 +139,32 @@ impl GameStorageAccess of StorageAccess::<Game> {
         let turn_duration_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 4_u8).into());
         StorageAccess::write(address_domain, turn_duration_base, value.turn_duration)?;
 
-        let prize_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 5_u8).into());
-        StorageAccess::write(address_domain, prize_base, value.prize)?;
-
-        let max_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 6_u8).into());
+        let max_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 5_u8).into());
         StorageAccess::write(address_domain, max_players_base, value.max_players)?;
 
-        let num_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
+        let num_players_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 6_u8).into());
         StorageAccess::write(address_domain, num_players_base, value.num_players)?;
 
-        let start_time_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
+        let start_time_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
         StorageAccess::write(address_domain, start_time_base, value.start_time)?;
 
-        let initial_hp_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 9_u8).into());
+        let initial_hp_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
         StorageAccess::write(address_domain, initial_hp_base, value.initial_hp)?;
 
-        let hunger_level_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 10_u8).into());
+        let hunger_level_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 9_u8).into());
         StorageAccess::write(address_domain, hunger_level_base, value.hunger_level)?;
 
-        let is_active_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
+        let is_active_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 10_u8).into());
         StorageAccess::write(address_domain, is_active_base, value.is_active)?;
 
-        let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 12_u8).into());
+        let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
         StorageAccess::write(address_domain, current_tour_base, value.current_tour)?;
 
-        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 13_u8).into());
-        StorageAccess::write(address_domain, entry_fee_base, value.entry_fee)
+        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 12_u8).into());
+        StorageAccess::write(address_domain, entry_fee_base, value.entry_fee)?;
 
-        
+        let prize_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 13_u8).into());
+        StorageAccess::write(address_domain, prize_base, value.prize)
 
     }
 }
@@ -195,7 +195,10 @@ impl PlayerStorageAccess of StorageAccess::<Player> {
         let is_alive_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
         let is_alive = StorageAccess::read(address_domain, is_alive_base)?;
 
-        Result::Ok(Player {health, name, pixel_heroes_id, address, nft_collection_address, nft_collection_token_id, move_turn, is_alive})
+        let move_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
+        let move = StorageAccess::read(address_domain, move_base)?;
+
+        Result::Ok(Player {health, name, pixel_heroes_id, address, nft_collection_address, nft_collection_token_id, move_turn, is_alive, move})
 
     }
 
@@ -221,7 +224,10 @@ impl PlayerStorageAccess of StorageAccess::<Player> {
         StorageAccess::write(address_domain, move_turn_base, value.move_turn)?;
 
         let is_alive_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 7_u8).into());
-        StorageAccess::write(address_domain, is_alive_base, value.is_alive)
+        StorageAccess::write(address_domain, is_alive_base, value.is_alive)?;
+        
+        let move_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 8_u8).into());
+        StorageAccess::write(address_domain, move_base, value.move)
 
     }
 }
@@ -237,6 +243,7 @@ mod dojo_arena {
     use starknet::get_caller_address;
     use starknet::contract_address_const;
     use starknet::get_block_timestamp;
+    use traits::Into;
 
     use super::IERC20DispatcherTrait;
     use super::IERC20Dispatcher;
@@ -247,7 +254,15 @@ mod dojo_arena {
     use openzeppelin::token::erc20::ERC20;
     use openzeppelin::access::ownable::Ownable;
 
-    const MAX_HEALTH: u16 = 2400;
+    const MAX_HEALTH: u16 = 4000;
+    const INITIAL_HP: u16 = 2400;
+    const HUNGER_LEVEL: u16 = 400;
+    const MOVE_NOT_MADE: u8 = 0_u8;
+    const MOVE_HUNT: u8 = 1_u8;
+    const MOVE_HIDE: u8 = 2_u8;
+    const MOVE_ATTACK: u8 = 3_u8;
+    const TURN_COUNT: u8 = 6;
+
 
 
     struct Storage {
@@ -266,11 +281,14 @@ mod dojo_arena {
     fn player_joined(game_id: u256, player_id: u16, player: Player, address: ContractAddress) {}
 
     #[event]
-    fn move_made(game_id: u256, player_id: u256, address: ContractAddress) {}
+    fn move_made(game_id: u256, player_id: u16, address: ContractAddress) {}
+
+    #[external]
+    fn player_dead(game_id: u256, player_id: u16){}
 
     #[constructor]
     fn constructor() {
-        game_count::write(0);
+        game_count::write(0_u256);
         //let address = get_caller_address();
         let address = contract_address_const::<0x00b42717976be9f43281e55e2420e6c41517cfd79076a7705fa3e91656d35bfb>();
         owner::write(address);
@@ -327,17 +345,17 @@ mod dojo_arena {
         _turn_duration: u64,
         _max_players: u16,
         _start_time: u64,
-        _initial_hp: u16,
-        _hunger_level: u16,
         _entry_fee:u256 ){
         
+        let fee = _entry_fee;
+
         //assert(_entry_fee>=11000000000000000, 'Not Enough Fee');
 
-        // let sender : ContractAddress= get_caller_address();
-        // let recipient : ContractAddress = get_contract_address();
-        // let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
-        // let success = IERC20Dispatcher { contract_address: token_addr }.transferFrom(sender, recipient, fee); 
-        // assert(success, 'Transfer Failed');
+        let sender : ContractAddress= get_caller_address();
+        let recipient : ContractAddress = get_contract_address();
+        let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
+        let success = IERC20Dispatcher { contract_address: token_addr }.transferFrom(sender, recipient, fee); 
+        assert(success, 'Transfer Failed');
 
 
         
@@ -350,6 +368,8 @@ mod dojo_arena {
         assert(_turn_duration>=3600,'Turn Duration under 1 hour');
         assert(_turn_duration<=21600,'Turn Duration above 6 hour');
 
+        
+
         let _winner = get_contract_address();
         let _caller = get_caller_address();
         let game = Game{
@@ -358,15 +378,16 @@ mod dojo_arena {
             winner: _winner,
             game_creator: _caller,
             turn_duration: _turn_duration,
-            prize: 0,
             max_players: _max_players,
-            num_players: 0,
+            num_players: 0_u16,
             start_time: _start_time,
-            initial_hp: _initial_hp,
-            hunger_level: _hunger_level,
+            initial_hp: INITIAL_HP,
+            hunger_level: HUNGER_LEVEL,
             is_active : true,
-            current_tour: 0,
-            entry_fee: _entry_fee
+            current_tour: 0_u8,
+            entry_fee: _entry_fee,
+            prize: 0_u256,
+
         };
 
         let _game_count = game_count::read();
@@ -388,8 +409,13 @@ mod dojo_arena {
         
         let _game_count = game_count::read();
         assert(game_id<=_game_count,'Invalid Game Id');
-        assert(game_id>0, 'Invalid Game Id');
+        assert(game_id>0_u256, 'Invalid Game Id');
         let mut game = games::read(game_id);
+
+        assert(game.max_players>game.num_players, 'Game is full');
+        assert(game.is_active,'Game is ended');
+        assert(game.current_tour==0_u8,'Game already started');
+
 
         
         let fee = game.entry_fee;
@@ -401,22 +427,25 @@ mod dojo_arena {
         let success = IERC20Dispatcher { contract_address: token_addr }.transferFrom(sender, recipient, fee); 
         assert(success, 'Transfer Failed');
 
-        assert(game.max_players>game.num_players, 'Game is full');
 
         let player = Player{
-            health: MAX_HEALTH,
+            health: INITIAL_HP,
             name: _name,
             pixel_heroes_id: _pixel_heroes_id,
             address: get_caller_address(),
             nft_collection_address: _nft_collection_address,
             nft_collection_token_id: _nft_collection_token_id,
-            move_turn: 1,
-            is_alive: true
+            move_turn: 1_u8,
+            is_alive: true,
+            move: 0_u8
 
         };
-        let player_id = game.num_players + 1;
+        let player_id = game.num_players + 1_u16;
 
         game.num_players = player_id;
+        game.prize = game.prize + fee;
+
+        games::write(game_id, game);
 
         players::write((game_id,player_id), player);
 
@@ -425,55 +454,82 @@ mod dojo_arena {
         
     }
 
+
     #[external]
     fn set_game_manager(address : ContractAddress){
         let _owner = owner::read();
         assert(_owner == get_caller_address(), 'Caller is not owner');
         game_manager::write(address);
 
-        // let sender : ContractAddress= get_caller_address();
-        // let recipient : ContractAddress = get_contract_address();
-        
-        
-        // let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
-        // let success = IERC20Dispatcher { contract_address: token_addr }.transferFrom(sender, recipient, amount); 
     }
+
 
     #[external]
     fn start_game(game_id:u256){
 
         let _game_count = game_count::read();
         assert(game_id<=_game_count,'Invalid Game Id');
-        assert(game_id>0, 'Invalid Game Id');
+        assert(game_id>0_u256, 'Invalid Game Id');
         let mut game = games::read(game_id);
-        assert(game.is_active,'Game is not active');
+        assert(game.is_active,'Game is ended');
         //assert(get_block_timestamp>=game.start_time, 'Wait for Start Time');
         //assert(game.num_players>=32, 'Not enough players');
+        
+        // if  game.num_players>=32 {
+        //     game.current_tour = 1_u8;
+        //     games::write(game_id, game);
+        // } else {
+            
+        // }
+
+        game.current_tour = 1_u8;
+        games::write(game_id, game);
 
 
-        game.current_tour = 1;        
     }
+
 
     #[external]
     fn hunt(game_id: u256, player_id: u16){
         let _game_count = game_count::read();
         assert(game_id<=_game_count,'Invalid Game Id');
-        assert(game_id>0, 'Invalid Game Id');
-        let game = games::read(game_id);
-        assert(game.is_active,'Game is not active');
+        assert(game_id>0_u256, 'Invalid Game Id');
+        let mut game = games::read(game_id);
+        assert(game.is_active,'Game is ended');
+        //assert(game.current_tour == 1_u8, 'Wait for Start Time');
+
 
         assert(player_id<=game.num_players, 'Invalid Player Id');
-        assert(player_id>0, 'Invalid Player Id');
+        assert(player_id>0_u16, 'Invalid Player Id');
 
-        let player = players::read((game_id,player_id));
+        let mut player = players::read((game_id,player_id));
         let caller : ContractAddress= get_caller_address();
         assert(player.address == get_caller_address(), 'Caller is not player');
-        //assert(player.move_made)
+        assert(player.move_turn<game.current_tour,'Move already made');
+        player.move_turn = player.move_turn + 1_u8;
+
+        let random : u8 = 65;
+
+        if random <= 50 {
+            player.health = (player.health + 900_u16)%MAX_HEALTH;
+        } else if random <= 70 {
+            player.health = (player.health + 450_u16)%MAX_HEALTH;
+        } else if random <= 90 {
+            
+            if  player.health<=200_u16 {
+                player.is_alive = false;
+                player_dead(game_id, player_id);
+            } else {
+                player.health = player.health - 200_u16;
+            }
+
+        } else {
+            player.is_alive = false;
+            player_dead(game_id, player_id);
+        }
 
 
-
-
-
+        players::write((game_id, player_id), player);
 
     }
 
@@ -481,44 +537,113 @@ mod dojo_arena {
     fn hide(game_id: u256, player_id: u16){
         let _game_count = game_count::read();
         assert(game_id<=_game_count,'Invalid Game Id');
-        assert(game_id>0, 'Invalid Game Id');
-        let game = games::read(game_id);
-        assert(game.is_active,'Game is not active');
+        assert(game_id>0_u256, 'Invalid Game Id');
+        let mut game = games::read(game_id);
+        assert(game.is_active,'Game is ended');
+        //assert(get_block_timestamp>=game.start_time, 'Wait for Start Time');
 
         assert(player_id<=game.num_players, 'Invalid Player Id');
-        assert(player_id>0, 'Invalid Player Id');
+        assert(player_id>0_u16, 'Invalid Player Id');
 
-        let player = players::read((game_id,player_id));
+        let mut player = players::read((game_id,player_id));
         let caller : ContractAddress= get_caller_address();
         assert(player.address == get_caller_address(), 'Caller is not player');
+        assert(player.is_alive, 'Player is dead');
+        assert(player.move_turn<game.current_tour,'Move already made');
+        player.move_turn = player.move_turn + 1_u8;
+
+        player.move = 2_u8;
+
+        players::write((game_id, player_id), player);
+
+        //assert(player.)
+        
         //assert(player.move_made)
         
     }
     #[external]
-    fn attack(game_id: u256, player_id: u16){
+    fn attack(game_id: u256, player_id: u16, attack_to_player_id: u16){
         let _game_count = game_count::read();
         assert(game_id<=_game_count,'Invalid Game Id');
-        assert(game_id>0, 'Invalid Game Id');
-        let game = games::read(game_id);
-        assert(game.is_active,'Game is not active');
+        assert(game_id>0_u256, 'Invalid Game Id');
+        let mut game = games::read(game_id);
+        assert(game.is_active,'Game is ended');
+        //assert(get_block_timestamp>=game.start_time, 'Wait for Start Time');
 
         assert(player_id<=game.num_players, 'Invalid Player Id');
-        assert(player_id>0, 'Invalid Player Id');
+        assert(player_id>0_u16, 'Invalid Player Id');
 
-        let player = players::read((game_id,player_id));
+
+        let mut player = players::read((game_id,player_id));
         let caller : ContractAddress= get_caller_address();
         assert(player.address == get_caller_address(), 'Caller is not player');
+        assert(player.is_alive, 'Player is dead');
+        assert(player.move_turn<game.current_tour,'Move already made');
+        player.move_turn = player.move_turn + 1_u8;
         //assert(player.move_made)
-        
+
+        assert(attack_to_player_id<=game.num_players, 'Invalid Player Id');
+        assert(attack_to_player_id>0_u16, 'Invalid Player Id');
+
+        let mut attack_to_player = players::read((game_id,player_id));
+
+
+        let random : u8 = 65;
+
+        if random <= 50 {
+            
+            if  attack_to_player.health<=600_u16 {
+                attack_to_player.is_alive = false;
+                player_dead(game_id, attack_to_player_id);
+            } else {
+                attack_to_player.health = attack_to_player.health - 600_u16;
+            }
+
+        } else if random <= 70 {
+            let just_place_holder = 42_u8;
+
+        } else if random  <= 80 {
+            attack_to_player.is_alive = false;
+            player_dead(game_id, attack_to_player_id);
+        }else if random <= 90 {
+            attack_to_player.is_alive = false;
+            player_dead(game_id, attack_to_player_id);
+            player.health = (player.health + 500_u16)%MAX_HEALTH;
+
+        } else if random <= 95 {
+            player.is_alive = false;
+            player_dead(game_id, player_id);
+        }  else {
+            if  player.health<=600_u16 {
+                player.is_alive = false;
+                player_dead(game_id, player_id);
+            } else {
+                player.health = player.health - 600_u16;
+            }
+
+        }
+        players::write((game_id, player_id), player);
+        players::write((game_id, attack_to_player_id), attack_to_player);
     }
 
     #[external]
     fn next_turn(game_id: u256){
         let _game_count = game_count::read();
         assert(game_id<=_game_count,'Invalid Game Id');
-        assert(game_id>0, 'Invalid Game Id');
-        let game = games::read(game_id);
-        assert(game.is_active,'Game is not active');
+        assert(game_id>0_u256, 'Invalid Game Id');
+        let mut game = games::read(game_id);
+        assert(game.is_active,'Game is ended');
+        assert(game.current_tour>0_u8, 'Game not started');
+
+        // let access_time = game.start_time +(game.turn_duration*game.current_tour.into());
+        // assert(access_time>=get_block_timestamp(),'Not time');
+
+        let tour = game.current_tour;
+        assert(tour<TURN_COUNT,'All turns ended');
+        game.current_tour = game.current_tour + 1_u8;
+        
+        games::write(game_id, game);
+
     }
 
     #[external]
@@ -526,10 +651,15 @@ mod dojo_arena {
         
         let _game_count = game_count::read();
         assert(game_id<=_game_count,'Invalid Game Id');
-        assert(game_id>0, 'Invalid Game Id');
-        let game = games::read(game_id);
-        assert(game.is_active,'Game is not active');
+        assert(game_id>0_u256, 'Invalid Game Id');
+        let mut game = games::read(game_id);
+        assert(game.is_active,'Game is ended');
 
+        // let access_time = game.start_time +(game.turn_duration*TURN_COUNT.into());
+        // assert(access_time>=get_block_timestamp(),'Not yet');
+
+        game.is_active = false;
+        games::write(game_id, game);
 
     }
 
@@ -560,11 +690,6 @@ mod dojo_arena {
     }
 
     
-    //contract issues need to be solved
-    //easiest to hardest
-    //first find erc721 end erc20 functions to implement
-    //second find hash function to mapping
-    //third fix randomness for now
       
 
 }
