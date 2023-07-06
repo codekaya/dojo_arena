@@ -31,7 +31,16 @@ trait IERC20 {
     fn transfer(recipient: ContractAddress, amount: u256) -> bool;
 }
 
+#[abi]
+trait prng {
+    fn update() -> u128;
+}
 
+#[abi]
+trait ERC721ABI {
+    #[view]
+    fn owner_of(token_id: u256) -> ContractAddress;
+}
 
 
 #[derive(Copy, Drop, Serde)] 
@@ -70,6 +79,7 @@ struct Player {
 
 //const ETH_ADDRESS = 0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7 ;
 // 0x00949f2bd2385e964d5abd755a53910b742b3643ff6847d010ba9ee6ab88d263
+//const PRNG_ADDRESS = 0x00fc715a0dfc32ac331565ed5b6d62fdf0ce59b68a47cd8be45055c32d5634b2;
 
 impl GameStorageAccess of StorageAccess::<Game> {
     fn read(address_domain: u32, base: StorageBaseAddress) -> SyscallResult::<Game> {
@@ -248,6 +258,12 @@ mod dojo_arena {
     use super::IERC20DispatcherTrait;
     use super::IERC20Dispatcher;
 
+    use super::prngDispatcherTrait;
+    use super::prngDispatcher;
+
+    use super::ERC721ABIDispatcherTrait;
+    use super::ERC721ABIDispatcher;
+
     use super::Game;
     use super::Player;
 
@@ -269,7 +285,7 @@ mod dojo_arena {
         games: LegacyMap::<u256, Game >,
         game_count: u256,
         players: LegacyMap::<(u256,u16), Player >,
-        random_seed: u256,
+        random_seed: u128,
         game_manager: ContractAddress,
         owner: ContractAddress,
     }
@@ -283,7 +299,7 @@ mod dojo_arena {
     #[event]
     fn move_made(game_id: u256, player_id: u16, address: ContractAddress) {}
 
-    #[external]
+    #[event]
     fn player_dead(game_id: u256, player_id: u16){}
 
     #[constructor]
@@ -303,7 +319,7 @@ mod dojo_arena {
     }
 
     #[view]
-    fn get_random_seed() -> u256 {
+    fn get_random_seed() -> u128 {
         return random_seed::read();
     }
     #[view]
@@ -404,7 +420,6 @@ mod dojo_arena {
     fn join_game(game_id:u256,
         _name: felt252,
         _pixel_heroes_id: u16,
-        _nft_collection_address: ContractAddress,
         _nft_collection_token_id: u16 ){
         
         let _game_count = game_count::read();
@@ -416,8 +431,12 @@ mod dojo_arena {
         assert(game.is_active,'Game is ended');
         assert(game.current_tour==0_u8,'Game already started');
 
+        let _nft_collection_address = game.nft_collection_address;
 
-        
+        // let nft_owner_address: ContractAddress = ERC721ABIDispatcher { contract_address: _nft_collection_address }.owner_of(_nft_collection_token_id); 
+        // assert(nft_owner_address==get_caller_address());
+
+
         let fee = game.entry_fee;
         //assert(fee>=11000000000000000, 'Not Enough Fee');
 
@@ -443,7 +462,9 @@ mod dojo_arena {
         let player_id = game.num_players + 1_u16;
 
         game.num_players = player_id;
-        game.prize = game.prize + fee;
+        
+        // let new_prize = game.prize + fee;
+        // game.prize = new_prize;
 
         games::write(game_id, game);
 
@@ -472,7 +493,7 @@ mod dojo_arena {
         assert(game_id>0_u256, 'Invalid Game Id');
         let mut game = games::read(game_id);
         assert(game.is_active,'Game is ended');
-        //assert(get_block_timestamp>=game.start_time, 'Wait for Start Time');
+        //assert(get_block_timestamp()>=game.start_time, 'Wait for Start Time');
         //assert(game.num_players>=32, 'Not enough players');
         
         // if  game.num_players>=32 {
@@ -496,7 +517,7 @@ mod dojo_arena {
         assert(game_id>0_u256, 'Invalid Game Id');
         let mut game = games::read(game_id);
         assert(game.is_active,'Game is ended');
-        //assert(game.current_tour == 1_u8, 'Wait for Start Time');
+        assert(game.current_tour >= 1_u8, 'Wait for Start Time');
 
 
         assert(player_id<=game.num_players, 'Invalid Player Id');
@@ -504,23 +525,34 @@ mod dojo_arena {
 
         let mut player = players::read((game_id,player_id));
         let caller : ContractAddress= get_caller_address();
-        assert(player.address == get_caller_address(), 'Caller is not player');
-        assert(player.move_turn<game.current_tour,'Move already made');
-        player.move_turn = player.move_turn + 1_u8;
+        assert(player.address == caller, 'Caller is not player');
+        assert(player.is_alive, 'Player is dead');
+        assert(player.move_turn<=game.current_tour,'Move already made');
+        let player_mov = player.move_turn + 1_u8;
+        player.move_turn = player_mov;
 
-        let random : u8 = 65;
 
-        if random <= 50 {
-            player.health = (player.health + 900_u16)%MAX_HEALTH;
-        } else if random <= 70 {
-            player.health = (player.health + 450_u16)%MAX_HEALTH;
-        } else if random <= 90 {
+
+        let token_addr: ContractAddress = contract_address_const::<0x00fc715a0dfc32ac331565ed5b6d62fdf0ce59b68a47cd8be45055c32d5634b2>();
+        let random_seed = prngDispatcher { contract_address: token_addr }.update(); 
+        assert(random_seed>0_u128, 'PRNG Failed');
+
+        let random:u128 = random_seed%100_u128;
+        random_seed::write(random);
+        if random <= 50_u128 {
+            let player_vv = (player.health + 900_u16)%MAX_HEALTH;
+            player.health = player_vv;
+        } else if random <= 70_u128 {
+            let player_vvv = (player.health + 450_u16)%MAX_HEALTH;
+            player.health = player_vvv;
+        } else if random <= 90_u128 {
             
             if  player.health<=200_u16 {
                 player.is_alive = false;
                 player_dead(game_id, player_id);
             } else {
-                player.health = player.health - 200_u16;
+                let player_v = player.health - 200_u16;
+                player.health = player_v;
             }
 
         } else {
@@ -528,7 +560,7 @@ mod dojo_arena {
             player_dead(game_id, player_id);
         }
 
-
+        player.move = 1_u8;
         players::write((game_id, player_id), player);
 
     }
@@ -540,7 +572,7 @@ mod dojo_arena {
         assert(game_id>0_u256, 'Invalid Game Id');
         let mut game = games::read(game_id);
         assert(game.is_active,'Game is ended');
-        //assert(get_block_timestamp>=game.start_time, 'Wait for Start Time');
+        assert(game.current_tour >= 1_u8, 'Wait for Start Time');
 
         assert(player_id<=game.num_players, 'Invalid Player Id');
         assert(player_id>0_u16, 'Invalid Player Id');
@@ -549,16 +581,15 @@ mod dojo_arena {
         let caller : ContractAddress= get_caller_address();
         assert(player.address == get_caller_address(), 'Caller is not player');
         assert(player.is_alive, 'Player is dead');
-        assert(player.move_turn<game.current_tour,'Move already made');
-        player.move_turn = player.move_turn + 1_u8;
+        assert(player.move_turn<=game.current_tour,'Move already made');
+        let player_mov = player.move_turn + 1_u8;
+        player.move_turn = player_mov;
 
         player.move = 2_u8;
 
         players::write((game_id, player_id), player);
 
-        //assert(player.)
         
-        //assert(player.move_made)
         
     }
     #[external]
@@ -568,7 +599,7 @@ mod dojo_arena {
         assert(game_id>0_u256, 'Invalid Game Id');
         let mut game = games::read(game_id);
         assert(game.is_active,'Game is ended');
-        //assert(get_block_timestamp>=game.start_time, 'Wait for Start Time');
+        assert(game.current_tour >= 1_u8, 'Wait for Start Time');
 
         assert(player_id<=game.num_players, 'Invalid Player Id');
         assert(player_id>0_u16, 'Invalid Player Id');
@@ -578,39 +609,49 @@ mod dojo_arena {
         let caller : ContractAddress= get_caller_address();
         assert(player.address == get_caller_address(), 'Caller is not player');
         assert(player.is_alive, 'Player is dead');
-        assert(player.move_turn<game.current_tour,'Move already made');
+        assert(player.move_turn<=game.current_tour,'Move already made');
         player.move_turn = player.move_turn + 1_u8;
-        //assert(player.move_made)
 
         assert(attack_to_player_id<=game.num_players, 'Invalid Player Id');
         assert(attack_to_player_id>0_u16, 'Invalid Player Id');
 
-        let mut attack_to_player = players::read((game_id,player_id));
+        let mut attack_to_player = players::read((game_id,attack_to_player_id));
+        assert( !(attack_to_player.move==2_u8 & attack_to_player.move_turn>game.current_tour), 'Player is Hiding');
+        assert(attack_to_player.is_alive, 'Player is dead');
+        assert(player_id!=attack_to_player_id,'Invalid Attack');
 
 
-        let random : u8 = 65;
+        let token_addr: ContractAddress = contract_address_const::<0x00fc715a0dfc32ac331565ed5b6d62fdf0ce59b68a47cd8be45055c32d5634b2>();
+        let random_seed: u128 = prngDispatcher { contract_address: token_addr }.update(); 
+        assert(random_seed>0_u128, 'PRNG Failed');
 
-        if random <= 50 {
+        let random:u128 = random_seed%100_u128;
+        random_seed::write(random);
+
+
+        if random <= 50_u128 {
             
             if  attack_to_player.health<=600_u16 {
                 attack_to_player.is_alive = false;
                 player_dead(game_id, attack_to_player_id);
             } else {
-                attack_to_player.health = attack_to_player.health - 600_u16;
+                let health_value = attack_to_player.health - 600_u16;
+                attack_to_player.health = health_value;
             }
 
-        } else if random <= 70 {
+        } else if random <= 70_u128 {
             let just_place_holder = 42_u8;
 
-        } else if random  <= 80 {
+        } else if random  <= 80_u128 {
             attack_to_player.is_alive = false;
             player_dead(game_id, attack_to_player_id);
-        }else if random <= 90 {
+        }else if random <= 90_u128 {
             attack_to_player.is_alive = false;
             player_dead(game_id, attack_to_player_id);
-            player.health = (player.health + 500_u16)%MAX_HEALTH;
+            let player_vv = (player.health + 500_u16)%MAX_HEALTH;
+            player.health = player_vv;
 
-        } else if random <= 95 {
+        } else if random <= 95_u128 {
             player.is_alive = false;
             player_dead(game_id, player_id);
         }  else {
@@ -618,10 +659,13 @@ mod dojo_arena {
                 player.is_alive = false;
                 player_dead(game_id, player_id);
             } else {
-                player.health = player.health - 600_u16;
+                let health_v = player.health - 600_u16;
+                player.health = health_v;
             }
 
         }
+
+        player.move = 3_u8;
         players::write((game_id, player_id), player);
         players::write((game_id, attack_to_player_id), attack_to_player);
     }
@@ -635,12 +679,27 @@ mod dojo_arena {
         assert(game.is_active,'Game is ended');
         assert(game.current_tour>0_u8, 'Game not started');
 
-        // let access_time = game.start_time +(game.turn_duration*game.current_tour.into());
+        // let multiplier: u64 = game.current_tour.try_into().unwrap();
+        // let access_time = game.start_time +(game.turn_duration*multiplier);
         // assert(access_time>=get_block_timestamp(),'Not time');
 
+        // let mut i : u_16 = 1;
+        // let count = 1
+        // loop {
+        //     if i > 10 {
+        //         break();
+        //     }
+        //     let id = i;
+
+
+        //         i += 1;
+        // }
+
+
         let tour = game.current_tour;
-        assert(tour<TURN_COUNT,'All turns ended');
-        game.current_tour = game.current_tour + 1_u8;
+        //assert(tour<TURN_COUNT,'All turns ended');
+        let tour_v = game.current_tour + 1_u8;
+        game.current_tour = tour_v;
         
         games::write(game_id, game);
 
@@ -658,12 +717,45 @@ mod dojo_arena {
         // let access_time = game.start_time +(game.turn_duration*TURN_COUNT.into());
         // assert(access_time>=get_block_timestamp(),'Not yet');
 
+        // let mut i : u_16 = 1;
+        // let count = 1;
+        // loop {
+        //     if i > 10 {
+        //         break();
+        //     }
+        //     let id = i;
+
+
+        //     i += 1;
+        // }
+
         game.is_active = false;
         games::write(game_id, game);
 
     }
 
-    
+    // #[external]
+    // fn claim_reward(game_id: u256){
+    //     let _game_count = game_count::read();
+    //     assert(game_id<=_game_count,'Invalid Game Id');
+    //     assert(game_id>0_u256, 'Invalid Game Id');
+    //     let mut game = games::read(game_id);
+
+    //     assert(game.winner == get_caller_address(),'You are not winner');
+
+    //     let recipient = game.winner;
+    //     let sender : ContractAddress = get_contract_address();
+    //     let amount = game.prize;
+    //     game.prize = 0_u256;
+        
+        
+    //     let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
+    //     let success = IERC20Dispatcher { contract_address: token_addr }.transfer(recipient, amount);
+
+    //     assert(success, 'Transfer Failed');
+
+    //     games::write(game_id, game);
+    // }
 
     #[external]
     fn withdraw(amount: u256){
