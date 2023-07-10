@@ -57,10 +57,10 @@ struct Game {
     hunger_level: u16,
     is_active: bool,
     current_tour: u8,
-    entry_fee : u256,
     prize: u256,
+    place_holder: u256,
+    entry_fee : u256
 
-    
 }
 
 #[derive(Copy, Drop, Serde)] 
@@ -119,18 +119,17 @@ impl GameStorageAccess of StorageAccess::<Game> {
         let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
         let current_tour = StorageAccess::read(address_domain, current_tour_base)?;
 
-        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 12_u8).into());
-        let entry_fee = StorageAccess::read(address_domain, entry_fee_base)?;
-
-        let prize_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 13_u8).into());
+        let prize_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 12_u8).into());
         let prize = StorageAccess::read(address_domain, prize_base)?;
 
-    
+        let place_holder_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 13_u8).into());
+        let place_holder = StorageAccess::read(address_domain, place_holder_base)?;
+
+        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 14_u8).into());
+        let entry_fee = StorageAccess::read(address_domain, entry_fee_base)?;    
 
 
-
-
-        Result::Ok(Game { name , nft_collection_address, winner, game_creator, turn_duration,  max_players, num_players, start_time, initial_hp, hunger_level, is_active, current_tour, entry_fee, prize})
+        Result::Ok(Game { name , nft_collection_address, winner, game_creator, turn_duration,  max_players, num_players, start_time, initial_hp, hunger_level, is_active, current_tour, prize, place_holder,  entry_fee })
 
     }
 
@@ -170,11 +169,14 @@ impl GameStorageAccess of StorageAccess::<Game> {
         let current_tour_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 11_u8).into());
         StorageAccess::write(address_domain, current_tour_base, value.current_tour)?;
 
-        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 12_u8).into());
-        StorageAccess::write(address_domain, entry_fee_base, value.entry_fee)?;
+        let prize_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 12_u8).into());
+        StorageAccess::write(address_domain, prize_base, value.prize)?;
 
-        let prize_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 13_u8).into());
-        StorageAccess::write(address_domain, prize_base, value.prize)
+        let place_holder_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 13_u8).into());
+        StorageAccess::write(address_domain, place_holder_base, value.place_holder)?;
+
+        let entry_fee_base = storage_base_address_from_felt252(storage_address_from_base_and_offset(base, 14_u8).into());
+        StorageAccess::write(address_domain, entry_fee_base, value.entry_fee)
 
     }
 }
@@ -278,6 +280,7 @@ mod dojo_arena {
     const MOVE_HIDE: u8 = 2_u8;
     const MOVE_ATTACK: u8 = 3_u8;
     const TURN_COUNT: u8 = 6;
+    const MIN_NUM_OF_PLAYER: u16 = 4_u16;
 
 
 
@@ -297,10 +300,22 @@ mod dojo_arena {
     fn player_joined(game_id: u256, player_id: u16, player: Player, address: ContractAddress) {}
 
     #[event]
-    fn move_made(game_id: u256, player_id: u16, address: ContractAddress) {}
+    fn attacked(game_id: u256, player_id: u16, attacked_player_id: u16) {}
+
+    #[event]
+    fn hided(game_id: u256, player_id: u16) {} 
+
+    #[event]
+    fn hunted(game_id: u256, player_id: u16) {}      
+
+    #[event]
+    fn on_next_turn(game_id: u256) {}
 
     #[event]
     fn player_dead(game_id: u256, player_id: u16){}
+
+    #[event]
+    fn game_ended(game_id: u256){}
 
     #[constructor]
     fn constructor() {
@@ -383,7 +398,7 @@ mod dojo_arena {
 
         assert(_turn_duration>=3600,'Turn Duration under 1 hour');
         assert(_turn_duration<=21600,'Turn Duration above 6 hour');
-
+        assert(_max_players>=MIN_NUM_OF_PLAYER, 'Invalid Max Player');
         
 
         let _winner = get_contract_address();
@@ -401,8 +416,9 @@ mod dojo_arena {
             hunger_level: HUNGER_LEVEL,
             is_active : true,
             current_tour: 0_u8,
-            entry_fee: _entry_fee,
             prize: 0_u256,
+            place_holder: 0_u256,
+            entry_fee: _entry_fee,
 
         };
 
@@ -463,8 +479,8 @@ mod dojo_arena {
 
         game.num_players = player_id;
         
-        // let new_prize = game.prize + fee;
-        // game.prize = new_prize;
+        let new_prize = game.prize + fee;
+        game.prize = new_prize;
 
         games::write(game_id, game);
 
@@ -494,7 +510,7 @@ mod dojo_arena {
         let mut game = games::read(game_id);
         assert(game.is_active,'Game is ended');
         //assert(get_block_timestamp()>=game.start_time, 'Wait for Start Time');
-        //assert(game.num_players>=32, 'Not enough players');
+        assert(game.num_players>=MIN_NUM_OF_PLAYER, 'Not enough players');
         
         // if  game.num_players>=32 {
         //     game.current_tour = 1_u8;
@@ -519,9 +535,28 @@ mod dojo_arena {
         assert(game.is_active,'Game is ended');
         assert(game.current_tour >= 1_u8, 'Wait for Start Time');
 
-
         assert(player_id<=game.num_players, 'Invalid Player Id');
         assert(player_id>0_u16, 'Invalid Player Id');
+
+        //------------
+        let mut i : u16 = 1_u16;
+        let mut count: u16 = 0_u16;
+        
+        loop {
+            if i > game.num_players {
+                break();
+            }
+            let check_game_status = players::read((game_id, i));
+            
+            if check_game_status.is_alive {
+                count += 1;
+            }
+
+            i += 1;
+        };
+        assert(count>1, 'Call End Game');
+        //-----------
+
 
         let mut player = players::read((game_id,player_id));
         let caller : ContractAddress= get_caller_address();
@@ -577,6 +612,25 @@ mod dojo_arena {
         assert(player_id<=game.num_players, 'Invalid Player Id');
         assert(player_id>0_u16, 'Invalid Player Id');
 
+        //------------
+        let mut i : u16 = 1_u16;
+        let mut count: u16 = 0_u16;
+        
+        loop {
+            if i > game.num_players {
+                break();
+            }
+            let check_game_status = players::read((game_id, i));
+            
+            if check_game_status.is_alive {
+                count += 1;
+            }
+
+            i += 1;
+        };
+        assert(count>1, 'Call End Game');
+        //-----------
+
         let mut player = players::read((game_id,player_id));
         let caller : ContractAddress= get_caller_address();
         assert(player.address == get_caller_address(), 'Caller is not player');
@@ -603,6 +657,25 @@ mod dojo_arena {
 
         assert(player_id<=game.num_players, 'Invalid Player Id');
         assert(player_id>0_u16, 'Invalid Player Id');
+
+        //------------
+        let mut i : u16 = 1_u16;
+        let mut count: u16 = 0_u16;
+        
+        loop {
+            if i > game.num_players {
+                break();
+            }
+            let check_game_status = players::read((game_id, i));
+            
+            if check_game_status.is_alive {
+                count += 1;
+            }
+
+            i += 1;
+        };
+        assert(count>1, 'Call End Game');
+        //-----------
 
 
         let mut player = players::read((game_id,player_id));
@@ -679,21 +752,34 @@ mod dojo_arena {
         assert(game.is_active,'Game is ended');
         assert(game.current_tour>0_u8, 'Game not started');
 
+        //------------
+        let mut i : u16 = 1_u16;
+        let mut count: u16 = 0_u16;
+        
+        loop {
+            if i > game.num_players {
+                break();
+            }
+            let check_game_status = players::read((game_id, i));
+            
+            if check_game_status.is_alive {
+                count += 1;
+            }
+
+            i += 1;
+        };
+        assert(count>1, 'Call End Game');
+        // we need to call endgame here
+        //-----------
+        let my_u8: u8 = game.current_tour;
+        let my_u16: u16 = my_u8.into();
+        let my_u32: u32 = my_u16.into();
+        let my_u64: u64 = my_u32.into();
+        let access_time = (my_u64*game.turn_duration)+game.start_time;
+        assert(access_time>=get_block_timestamp(),'Not time');
         // let multiplier: u64 = game.current_tour.try_into().unwrap();
         // let access_time = game.start_time +(game.turn_duration*multiplier);
         // assert(access_time>=get_block_timestamp(),'Not time');
-
-        // let mut i : u_16 = 1;
-        // let count = 1
-        // loop {
-        //     if i > 10 {
-        //         break();
-        //     }
-        //     let id = i;
-
-
-        //         i += 1;
-        // }
 
 
         let tour = game.current_tour;
@@ -714,48 +800,51 @@ mod dojo_arena {
         let mut game = games::read(game_id);
         assert(game.is_active,'Game is ended');
 
-        // let access_time = game.start_time +(game.turn_duration*TURN_COUNT.into());
-        // assert(access_time>=get_block_timestamp(),'Not yet');
+         //------------
+        let mut i : u16 = 1_u16;
+        let mut count: u16 = 0_u16;
+        
+        loop {
+            if i > game.num_players {
+                break();
+            }
+            let check_game_status = players::read((game_id, i));
+            
+            if check_game_status.is_alive {
+                count += 1;
+                game.winner = check_game_status.address;
+            }
 
-        // let mut i : u_16 = 1;
-        // let count = 1;
-        // loop {
-        //     if i > 10 {
-        //         break();
-        //     }
-        //     let id = i;
+            i += 1;
+        };
+        assert(count>1, 'There are still players');
+        //-----------
+
+        
 
 
-        //     i += 1;
-        // }
+        let creator = game.game_creator;
+
+        let _prize = game.prize;
+        // let winner_reward = _prize*9_u256/10_u256;
+        // let recipient = game.winner;
+        // let creator_reward = _prize/20_u256;
+        // let sender : ContractAddress = get_contract_address();
+        
+        
+        // let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
+        // let success = IERC20Dispatcher { contract_address: token_addr }.transfer(creator, creator_reward);
+        // assert(success, 'Transfer Failed');
+
+        // let _success = IERC20Dispatcher { contract_address: token_addr }.transfer(recipient, winner_reward);
+        // assert(_success, 'Transfer Failed');
 
         game.is_active = false;
         games::write(game_id, game);
+        game_ended(game_id);
 
     }
 
-    // #[external]
-    // fn claim_reward(game_id: u256){
-    //     let _game_count = game_count::read();
-    //     assert(game_id<=_game_count,'Invalid Game Id');
-    //     assert(game_id>0_u256, 'Invalid Game Id');
-    //     let mut game = games::read(game_id);
-
-    //     assert(game.winner == get_caller_address(),'You are not winner');
-
-    //     let recipient = game.winner;
-    //     let sender : ContractAddress = get_contract_address();
-    //     let amount = game.prize;
-    //     game.prize = 0_u256;
-        
-        
-    //     let token_addr: ContractAddress = contract_address_const::<0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7>();
-    //     let success = IERC20Dispatcher { contract_address: token_addr }.transfer(recipient, amount);
-
-    //     assert(success, 'Transfer Failed');
-
-    //     games::write(game_id, game);
-    // }
 
     #[external]
     fn withdraw(amount: u256){
@@ -785,3 +874,10 @@ mod dojo_arena {
       
 
 }
+
+//yapılcaklar:
+// endgame ve nextturn fonksiyonları güncellencek +
+// nft sahipmi kontrolü yapılcaklar yapıldı gerçi kontrol et
+// start game fonksiyonu güncellencek
+// claim_reward fonksiyonu güncellencek
+// move eventini ekle
